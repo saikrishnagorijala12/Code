@@ -1,0 +1,5 @@
+.hubsync/
+hubsync/__pycache__/
+hubsync/routes/__pycache__/
+hubsync/service/__pycache__/
+.env
