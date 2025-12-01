@@ -1,27 +1,22 @@
-from flask import (
-    redirect,
-    url_for,
-    session,
-    Blueprint,
-    render_template_string,
-    jsonify,
-)
-import os, time, requests
+from flask import redirect, render_template, url_for, session, Blueprint, render_template_string, jsonify
+import os, time, requests, json
 from threading import Lock
-import json
 
 
+# Load config JSON
 with open("domo.json", "r") as f:
     data = json.load(f)
 
 domo_bp = Blueprint('domo', __name__, url_prefix='/domo')
 
+# Environment variables
 DOMO_API_HOST = os.getenv("DOMO_API_HOST")
 DOMO_EMBED_HOST = os.getenv("DOMO_EMBED_HOST")
 DOMO_CLIENT_ID = os.getenv("DOMO_CLIENT_ID")
 DOMO_CLIENT_SECRET = os.getenv("DOMO_CLIENT_SECRET")
 CARD_DASHBORD = os.getenv("C_D")
 
+# Token cache
 DOMO_TOKEN_CACHE = {"access_token": None, "expires_at": 0}
 _DOMO_TOKEN_LOCK = Lock()
 
@@ -32,7 +27,6 @@ _DOMO_TOKEN_LOCK = Lock()
 def get_domo_access_token(scopes: str = "data user dashboard"):
     now = time.time()
     with _DOMO_TOKEN_LOCK:
-        # Use cache if token still valid
         if DOMO_TOKEN_CACHE["access_token"] and DOMO_TOKEN_CACHE["expires_at"] > now + 5:
             return DOMO_TOKEN_CACHE["access_token"]
 
@@ -45,13 +39,10 @@ def get_domo_access_token(scopes: str = "data user dashboard"):
         r.raise_for_status()
         j = r.json()
 
-        access_token = j.get("access_token")
-        expires_in = int(j.get("expires_in", 300))
+        DOMO_TOKEN_CACHE["access_token"] = j.get("access_token")
+        DOMO_TOKEN_CACHE["expires_at"] = time.time() + int(j.get("expires_in", 300))
 
-        DOMO_TOKEN_CACHE["access_token"] = access_token
-        DOMO_TOKEN_CACHE["expires_at"] = time.time() + expires_in
-
-        return access_token
+        return DOMO_TOKEN_CACHE["access_token"]
 
 
 # ---------------------------
@@ -81,7 +72,6 @@ def create_domo_embed_token(access_token: str, embed_id: str, session_length_min
 
     r = requests.post(embed_token_url, headers=headers, json=payload, timeout=10)
     r.raise_for_status()
-
     return r.json().get("authentication")
 
 
@@ -90,13 +80,6 @@ def create_domo_embed_token(access_token: str, embed_id: str, session_length_min
 # ---------------------------
 def is_logged_in():
     return "user" in session
-
-
-@domo_bp.route("/api/me")
-def api_me():
-    if not is_logged_in():
-        return jsonify({"error": "Unauthorized"}), 401
-    return jsonify({"user": session["user"]})
 
 
 def choose_embed_pages_for_user(user):
@@ -128,101 +111,7 @@ def embed_page():
     except Exception as e:
         return render_template_string("<h3>Error generating embed tokens</h3><pre>{{err}}</pre>", err=str(e)), 500
 
-    embed_template = """
-<!doctype html>
-<html>
-<head>
-<meta charset="utf-8" />
-<title>Domo Tabbed Embed</title>
-<style>
-    body { margin: 0; padding: 0; background: #eef7f8; font-family: sans-serif; }
-
-    .tabs {
-        display: flex;
-        background: #ffffff;
-        border-bottom: 2px solid #ccc;
-    }
-
-    .tab {
-        padding: 12px 20px;
-        cursor: pointer;
-        border-right: 1px solid #ddd;
-        background: #f5f5f5;
-        font-weight: 500;
-        transition: background .2s;
-    }
-
-    .tab:hover {
-        background: #e8e8e8;
-    }
-
-    .tab.active {
-        background: #379095;
-        color: white;
-    }
-
-    iframe {
-        width: 100%;
-        height: calc(100vh - 60px);
-        border: none;
-        display: none;
-    }
-
-    iframe.active {
-        display: block;
-    }
-</style>
-</head>
-<body>
-
-<div class="tabs">
-{% for item in embeds %}
-    <div class="tab {% if loop.first %}active{% endif %}" data-target="frame{{ loop.index }}">
-        Dashboard {{ loop.index }}
-    </div>
-{% endfor %}
-</div>
-
-{% for item in embeds %}
-    <form id="form{{ loop.index }}" action="{{ host }}/embed/pages/{{ item.id }}" method="post" target="frame{{ loop.index }}">
-        <input type="hidden" name="embedToken" value="{{ item.token }}">
-    </form>
-
-    <iframe 
-        name="frame{{ loop.index }}" 
-        id="frame{{ loop.index }}" 
-        class="{% if loop.first %}active{% endif %}">
-    </iframe>
-{% endfor %}
-
-<script>
-    // Auto-submit forms to load iframes
-    document.querySelectorAll("form").forEach(form => form.submit());
-
-    // Tab switching logic
-    const tabs = document.querySelectorAll(".tab");
-    const frames = document.querySelectorAll("iframe");
-
-    tabs.forEach(tab => {
-        tab.addEventListener("click", () => {
-            // Remove active classes
-            tabs.forEach(t => t.classList.remove("active"));
-            frames.forEach(f => f.classList.remove("active"));
-
-            // Activate clicked tab + matching iframe
-            tab.classList.add("active");
-            let frame = document.getElementById(tab.dataset.target);
-            if (frame) frame.classList.add("active");
-        });
-    });
-</script>
-
-</body>
-</html>
-"""
-
-    return render_template_string(embed_template, embeds=embeds, host=DOMO_EMBED_HOST)
-
+    return render_template("domo_embed.html", embeds=embeds, host=DOMO_EMBED_HOST)
 
 
 # ---------------------------
@@ -257,14 +146,15 @@ def domo_embed_token_api():
         return jsonify({"error": "failed to create embed tokens", "detail": str(e)}), 500
 
 
+
 # ---------------------------
 # USER CREATION (OPTIONAL)
 # ---------------------------
-def domo_create_user(access_token: str, email: str, first_name: str = "", last_name: str = "", role: str = "Participant"):
-    users_endpoint = f"{DOMO_API_HOST}/v1/users"
-    payload = {"email": email, "firstName": first_name, "lastName": last_name, "role": role}
-    headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
+# def domo_create_user(access_token: str, email: str, first_name: str = "", last_name: str = "", role: str = "Participant"):
+#     users_endpoint = f"{DOMO_API_HOST}/v1/users"
+#     payload = {"email": email, "firstName": first_name, "lastName": last_name, "role": role}
+#     headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
 
-    r = requests.post(users_endpoint, headers=headers, json=payload, timeout=10)
-    r.raise_for_status()
-    return r.json()
+#     r = requests.post(users_endpoint, headers=headers, json=payload, timeout=10)
+#     r.raise_for_status()
+#     return r.json()
