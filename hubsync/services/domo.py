@@ -4,11 +4,11 @@ import requests
 from threading import Lock
 from flask import session, current_app
 
-# load mapping from disk once
+
 with open("domo.json", "r") as f:
     domo_user_map = json.load(f)
 
-# Token cache keyed by client_id so multiple clients don't overwrite each other's token
+
 _token_cache = {}
 _token_lock = Lock()
 
@@ -20,7 +20,6 @@ def _get_config():
         "api_host": cfg.get("DOMO_API_HOST"),
         "embed_host": cfg.get("DOMO_EMBED_HOST"),
         "card_target": cfg.get("CARD_DASHBOARD", "cards"),
-        # fallback secrets (useful in dev or when domo.json has no entry)
         "fallback_client_id": cfg.get("DOMO_CLIENT_ID"),
         "fallback_client_secret": cfg.get("DOMO_CLIENT_SECRET"),
     }
@@ -31,7 +30,6 @@ def _find_domo_entry_by_email(email: str):
     if not email:
         return None
     for entry in domo_user_map:
-        # be tolerant of key presence/format
         if entry.get("email") and entry.get("email").lower() == email.lower():
             return entry
     return None
@@ -47,18 +45,15 @@ def _get_client_credentials_for_session():
     """
     cfg = _get_config()
     user = session.get("user")
-    # prefer the user entry in domo.json
     if user:
         email = user.get("preferred_username") or user.get("email")
         entry = _find_domo_entry_by_email(email)
         if entry:
             client_id = entry.get("DOMO_CLIENT_ID") or entry.get("client_id") or entry.get("DOMO_CLIENTID")
             client_secret = entry.get("DOMO_CLIENT_SECRET") or entry.get("client_secret") or entry.get("DOMO_CLIENTSECRET")
-            # return if at least client_id found (secret may be missing if using client-credentials stored elsewhere)
             if client_id:
                 return client_id, client_secret
 
-    # fallback to config
     if cfg["fallback_client_id"]:
         return cfg["fallback_client_id"], cfg["fallback_client_secret"]
 
@@ -79,14 +74,10 @@ def get_access_token(scopes: str = "data user dashboard"):
         if cached and cached.get("access_token") and cached.get("expires_at", 0) > now + 5:
             return cached["access_token"]
 
-    # build token URL from config
     cfg = _get_config()
     token_url = f"{cfg['api_host'].rstrip('/')}/oauth/token"
 
-    # ensure secrets present for request
     if not client_id or not client_secret:
-        # In case the secret is not stored in domo.json (or missing), prefer raising
-        # rather than attempting unauthenticated requests.
         raise ValueError("Missing client_secret for DOMO client_id: %s" % client_id)
 
     response = requests.post(

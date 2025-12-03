@@ -36,7 +36,7 @@ def login():
     return redirect(auth_url)
 
 
-@auth_bp.route("/getAToken")  # Dynamic based on config handled below
+@auth_bp.route("/getAToken")  
 def authorized():
     cfg = _get_config()
 
