@@ -2,4 +2,5 @@
 hubsync/__pycache__/
 hubsync/routes/__pycache__/
 hubsync/services/__pycache__/
+hubsync/config/__pycache__/
 .env
