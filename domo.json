@@ -1,18 +1,26 @@
 [
   {
     "email": "abhinay@saikrishnagorijalahotmail.onmicrosoft.com",
-    "embed_id": "RPlXR"
+    "embed_id": "RPlXR",
+    "DOMO_CLIENT_ID":"b77f616c-0f76-4bb7-bb6c-30fc7901465e",
+    "DOMO_CLIENT_SECRET":"b328a4d87f85c7281017f8f4de2dcc00eaecc78dfb43190a11f413e507f455ba"
   },
   {
     "email": "user@saikrishnagorijalahotmail.onmicrosoft.com",
-    "embed_id": "V7vW1"
+    "embed_id": "V7vW1",
+    "DOMO_CLIENT_ID":"51b4d63b-9980-4d85-b8e3-b22815a20fbd",
+    "DOMO_CLIENT_SECRET":"ccc077af56bd40e87992759df932281bbacc1a7fe24ed921d209cc6388d2bd6d"
   },
   {
     "email": "rohithkumar@saikrishnagorijalahotmail.onmicrosoft.com",
-    "embed_id": "RPlXR"
+    "embed_id": "RPlXR",
+    "DOMO_CLIENT_ID":"51b4d63b-9980-4d85-b8e3-b22815a20fbd",
+    "DOMO_CLIENT_SECRET":"ccc077af56bd40e87992759df932281bbacc1a7fe24ed921d209cc6388d2bd6d"
   },
   {
     "email": "rohithkumar@saikrishnagorijalahotmail.onmicrosoft.com",
-    "embed_id": "V7vW1"
+    "embed_id": "V7vW1",
+    "DOMO_CLIENT_ID":"51b4d63b-9980-4d85-b8e3-b22815a20fbd",
+    "DOMO_CLIENT_SECRET":"ccc077af56bd40e87992759df932281bbacc1a7fe24ed921d209cc6388d2bd6d"
   }
 ]
